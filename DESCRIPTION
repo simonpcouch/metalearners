@@ -18,5 +18,6 @@ RoxygenNote: 7.3.1
 Depends: 
     R (>= 2.10)
 LazyData: true
-URL: https://github.com/simonpcouch/metalearners
+URL: https://github.com/simonpcouch/metalearners, https://simonpcouch.github.io/metalearners/
 BugReports: https://github.com/simonpcouch/metalearners/issues
+Config/Needs/website: tidyverse, gt, monochromeR, rmarkdown, tidyverse/tidytemplate
