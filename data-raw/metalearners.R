@@ -26,7 +26,7 @@ metalearners <- metalearners %>%
     recipe = case_when(
       recipe == "minimal" ~ "Minimal",
       recipe == "normalize" ~ "Center + Scale",
-      recipe == "pca" ~ "Principle Component Analysis",
+      recipe == "pca" ~ "Principal Component Analysis",
       recipe == "renormalize" ~ "C+S, PCA, C+S"
     ),
     spec = case_when(
