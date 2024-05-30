@@ -2,3 +2,10 @@ url: https://simonpcouch.github.io/metalearners/
 template:
   bootstrap: 5
 
+navbar:
+ structure:
+   left: [reference, analysis]
+ components:
+   analysis:
+     text: Analysis
+     href: articles/analysis.html
