@@ -1,0 +1,261 @@
+---
+editor: visual
+title: "Generalizing the meta-learner in stacks"
+author: "Simon P. Couch and Max Kuhn"
+---
+
+The [stacks](https://github.com/tidymodels/stacks) package was [first released](https://www.tidyverse.org/blog/2020/11/stacks-0-1-0/) to CRAN in late 2020, enabling model stacking (or "ensembling") with tidymodels. Model stacking is a machine learning technique that involves combining predictions from several statistical models into one, and has been shown to improve predictive performance in a variety of areas. The model that combines predictions, called the "meta-learner," is most often a regularized linear model. We recently conducted a set of experiments to explore the possibility of enabling stacking with other meta-learners.
+
+This analysis uses functions from the tidyverse meta-package as well as the gt, monochromeR, and metalearners packages.
+
+## Overview of stacking
+
+At the highest level, ensembles are formed from *model definitions*. In this package, model definitions are an instance of a minimal [workflow](https://workflows.tidymodels.org/), containing a *model specification* (as defined in the [parsnip](https://parsnip.tidymodels.org/) package) and, optionally, a *preprocessor* (as defined in the [recipes](https://recipes.tidymodels.org/) package). Model definitions specify the form of candidate ensemble members.
+
+![](https://github.com/tidymodels/stacks/blob/f95369f45353d09a8c81fd3592ebcf8bc8232d6b/man/figures/model_defs.png?raw=true){fig-alt="A diagram representing “model definitions,” which specify the form of candidate ensemble members. Three colored boxes represent three different model types; a K-nearest neighbors model (in salmon), a linear regression model (in yellow), and a support vector machine model (in green)."}
+
+To be used in the same ensemble, each of these model definitions must share the same *resample*. This [rsample](https://rsample.tidymodels.org/) `rset` object, when paired with the model definitions, can be used to generate the tuning/fitting results objects for the candidate *ensemble members* with tune.
+
+![](https://github.com/tidymodels/stacks/blob/f95369f45353d09a8c81fd3592ebcf8bc8232d6b/man/figures/candidates.png?raw=true){fig-alt="A diagram representing “candidate members” generated from each model definition. Four salmon-colored boxes labeled “KNN” represent K-nearest neighbors models trained on the resamples with differing hyperparameters. Similarly, the linear regression model generates one candidate member, and the support vector machine model generates six."}
+
+Candidate members first come together in a `data_stack` object through the `add_candidates()` function. Principally, data stacks are just [tibble](https://tibble.tidyverse.org/)s, where the first column gives the true outcome in the assessment set (the portion of the training set used for model validation), and the remaining columns give the predictions from each candidate ensemble member. They also bring along a few extra attributes to keep track of model definitions.
+
+![](https://github.com/tidymodels/stacks/blob/f95369f45353d09a8c81fd3592ebcf8bc8232d6b/man/figures/data_stack.png?raw=true){fig-alt="A diagram representing a “data stack,” a specific kind of data frame. Colored “columns” depict, in white, the true value of the outcome variable in the validation set, followed by four columns (in salmon) representing the predictions from the K-nearest neighbors model, one column (in tan) representing the linear regression model, and six (in green) representing the support vector machine model."}
+
+Then, the data stack can be evaluated using `blend_predictions()` to determine to how best to combine the outputs from each of the candidate members using a regularized linear regression model. In the stacking literature, this process is commonly called *metalearning*.
+
+The outputs of each member are likely highly correlated. Thus, depending on the degree of regularization you choose, the coefficients for the inputs of (possibly) many of the members will zero out—their predictions will have no influence on the final output, and those terms will thus be thrown out.
+
+![](https://github.com/tidymodels/stacks/blob/f95369f45353d09a8c81fd3592ebcf8bc8232d6b/man/figures/coefs.png?raw=true){fig-alt="A diagram representing “stacking coefficients,” the coefficients of the linear model combining each of the candidate member predictions to generate the ensemble’s ultimate prediction. Boxes for each of the candidate members are placed besides each other, filled in with color if the coefficient for the associated candidate member is nonzero."}
+
+These stacking coefficients determine which candidate ensemble members will become ensemble members. Candidates with non-zero stacking coefficients are then fitted on the whole training set, altogether making up a `model_stack` object.
+
+![](https://github.com/tidymodels/stacks/blob/f95369f45353d09a8c81fd3592ebcf8bc8232d6b/man/figures/class_model_stack.png?raw=true){fig-alt="A diagram representing the “model stack” class, which collates the stacking coefficients and members (candidate members with nonzero stacking coefficients that are trained on the full training set). The representation of the stacking coefficients is as before, where the members (shown next to their associated stacking coefficients) are colored-in pentagons. Model stacks are a list subclass."}
+
+This model stack object, outputted from `fit_members()`, is ready to predict on new data! The trained ensemble members are often referred to as *base models* in the stacking literature.
+
+## Generalizing the meta-learner
+
+Since we released the package, the question we've received by far more often than any other is whether we'll introduce support for stacking models with a meta-learner other than a regularized linear regression model. Because of this, we asked tidymodels users whether this feature is one you'd be interested in as part of the [2024 tidymodels user survey](https://colorado.posit.co/rsc/tidymodels-priorities-2024/), and got a resounding "yes."
+
+There are a few good reasons we initially only implemented stacking with regularized linear models:
+
+-   The original paper proposing stacking does so only with a regularized linear model.
+
+-   Regularized linear models with the elastic net handle correlated predictors quite well. By definition, the predictors supplied to the meta-learner are highly correlated (or at least ought to be), since those predictors are *predictions* of the same outcome from a bunch of different statistical models.
+
+-   Regularized linear models with the elastic net "zero out" some predictors (i.e. shrink their associated coefficients to zero). In the case of stacking, zeroing out predictors is really advantageous, since models whose predictors are associated with nonzero coefficients—or "members"—must be then trained on the full training set. Training members (with `fit_members()`) is one of the three highly computationally intensive steps in model stacking, and reducing the number of members that need to be trained can greatly reduce the amount of time required to create a model stack.
+
+-   Simon was a tired student when he wrote the first versions of the package.
+
+Because of these reasons (maybe omitting the last), regularized linear models are by far the most popular meta-learner used in the literature.
+
+That said, there are all sorts of methods out there to handle correlated data and disinclude certain predictors in statistical models. In considering whether to implement this functionality, we decided to conduct [a series of experiments](https://github.com/simonpcouch/metalearner) to benchmark the predictive performance and time-to-fit for a variety of meta-learners.
+
+## The experiments
+
+To decide whether to implement a generalized meta-learner in stacks, we conducted a series of experiments to answer the question:
+
+> Do some meta-learners reliably fit more quickly or provide more performant predictions than a regularized linear model across contexts?
+
+We first built a rough proof-of-concept for an interface to a generalized meta-learner in stacks. That user interface definitely would have had some improvements to make, but gave us a good-enough tool to experiment with. Then, we collected a set of 8 machine learning tasks that varied in their outcome type (numeric or factor), dataset size, and correlation structure. Then, for each of those tasks, we:
+
+1.  Interactively developed models to best predict the outcome, which would form the candidate members.
+
+2.  Fitted *all* of the candidate members. Note that this breaks with the usual flow of model stacking with stacks; to reduce duplicated member fits, we decided to first fit all of the candidate members and then "drop them in place" when they were needed. (In the language of the package, we did `stacks() %>% add_candidates(...) %>% fit_members() %>% blend_predictions()` rather than the usual `stacks() %>% add_candidates(...) %>% blend_predictions() %>% fit_members()`.)
+
+3.  Resampled each of a set of 12 proposed meta-learners that we hypothesized would perform well, benchmarking timings as we did so.
+
+4.  Generated predictions from each of those resampled meta-learners and evaluated those predictions with metrics.
+
+5.  Finally, we collated all of those metrics and benchmarks, as well as related metadata, into the dataset `metalearners`, which is now available as a data package on CRAN.
+
+Here are those 12 proposed meta-learners I mentioned in Step 3):
+
+```{r print-meta-learners, echo = FALSE, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(gt)
+library(metalearners)
+
+metalearners %>%
+  select(
+    `Meta-learner` = meta_learner, 
+    Recipe = recipe, 
+    Specification = specification
+  ) %>%
+  unique() %>%
+  gt() %>%
+  cols_align("left")
+```
+
+The exact definitions of each the above recipes and model specifications can be found in the [experiment repository](https://github.com/simonpcouch/metalearner/tree/dbf91c00506de6bae9a7dd07155a8b781af38c51/meta_learners).
+
+The resulting dataset containing experiment metadata, performance metrics, and speed benchmarks is available in the metalearners data package:
+
+```{r}
+library(metalearners)
+
+metalearners
+```
+
+Each row in the resulting dataset represents a unique combination of task, proposed meta-learner (as `recipe` + `specification`), and performance metric. The meta-learner with `recipe == "basic"` and `spec == "glmnet"` is the existing, regularized linear model in stacks.
+
+## Results
+
+Revisiting our original research question, we're interested in the distributions of 1) elapsed time-to-fit benchmarks and 2) performance metrics for each proposed meta-learner. The first one is a bit easier to analyze, so we'll start there.
+
+```{r, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(gt)
+library(monochromeR)
+```
+
+### Elapsed time
+
+While there are multiple performance metrics for each unique combination of task and meta-learner, there is only one fit time. This makes
+
+```{r}
+metalearners_times <- 
+  metalearners %>% 
+  slice_head(n = 1, by = c(task, recipe, specification))
+
+metalearners_times
+```
+
+Perhaps best expressed as a table:
+
+```{r}
+metalearners_times %>%
+  summarize(
+    Minimum = min(elapsed),
+    `1st Quartile` = quantile(elapsed, .25),
+    Median = median(elapsed),
+    Mean = mean(elapsed), 
+    `3rd Quartile` = quantile(elapsed, .75),
+    Maximum = max(elapsed), 
+    .by = c(recipe, specification)
+  ) %>%
+  gt() %>%
+  fmt_number() %>%
+  cols_label_with(c("recipe", "specification"), function(x) {md(paste0("`", x, "`"))}) %>%
+  data_color(
+    columns = Minimum:Maximum,
+    method = "quantile", 
+    palette = generate_palette("#bfa382", "go_lighter", 20),
+    reverse = TRUE,
+    quantiles = 20
+  )
+
+```
+
+The fastest model fits are shaded in the lightest reds, and nearly all of them belong to glmnet.
+
+Maybe the most telling statistic: does another meta-learner *ever* resample more quickly than glmnet?
+
+```{r}
+metalearners_times %>%
+  summarize(
+    glmnet_is_fastest = 
+      all(elapsed[specification == "GLM (glmnet)"] < 
+          elapsed[specification != "GLM (glmnet)"]),
+    .by = task
+  )
+```
+
+Almost batting 1000.
+
+The conclusion here definitely seems to be that, with a data structure like a data stack, a regularized linear model like glmnet is the quickest-fitting among the models we tried. However, if other meta-learners we've proposed deliver consistently improved predictive performance, we still ought to consider implementing that generalized meta-learner.
+
+### Performance metrics
+
+The summarization of results is a bit more complicated when it comes to performance metrics, as there are multiple metrics (representing different interpretations of predictive performance) for each experiment.
+
+Let's start with the classification tasks, which all use a common set of metrics. First, some transformation:
+
+```{r}
+metalearners_metrics <-
+  metalearners %>%
+  summarize(
+    mean = mean(estimate, na.rm = TRUE),
+    sd = sd(estimate, na.rm = TRUE),
+    .by = c(recipe, specification, metric)
+  ) %>%
+  pivot_wider(id_cols = c(recipe, specification), names_from = metric, values_from = c(mean, sd), names_vary = "slowest")
+```
+
+Then, making use of some formatting magic from the gt package:
+
+```{r}
+gt(metalearners_metrics) %>%
+  fmt_number() %>%
+  tab_spanner(md("`rsq()`"), contains("rsq")) %>%
+  tab_spanner(md("`rmse()`"), contains("rmse")) %>%
+  tab_spanner(md("`accuracy()`"), contains("accuracy")) %>%
+  tab_spanner(md("`brier_class()`"), contains("brier_class")) %>%
+  tab_spanner(md("`roc_auc()`"), contains("roc_auc")) %>%
+  tab_spanner(
+    "Regression", 
+    spanners = c("`rsq()`", "`rmse()`")
+  ) %>%
+  tab_spanner(
+    "Classification", 
+    spanners = c("`accuracy()`", "`brier_class()`", "`roc_auc()`")
+  ) %>%
+  cols_label_with(fn = function(x) {
+    gsub("\\_accuracy|\\_brier\\_class|_roc\\_auc|\\_rsq|\\_rmse", "", x) 
+  }) %>%
+  # metrics where higher values mean better performance:
+  data_color(
+    c("mean_rsq", "mean_accuracy", "mean_roc_auc"), 
+    method = "numeric", 
+    palette = generate_palette("#79b9aa", "go_lighter", 10),
+    reverse = TRUE
+  ) %>%
+  # metrics where lower values mean better performance
+  data_color(
+    c("mean_rmse", "mean_brier_class"), 
+    method = "numeric", 
+    palette = generate_palette("#79b9aa", "go_lighter", 10),
+    reverse = FALSE
+  ) %>%
+  data_color(
+    contains("sd"), 
+    method = "numeric", 
+    palette = generate_palette("#bfa382", "go_lighter", 10),
+    reverse = TRUE
+  )
+```
+
+In the above table, darker green metric values indicate better average performance, and darker red standard deviations indicate more variation in the metric value from task to task.
+
+At least as far as these classification metrics go, there's not a clear winner here, though the meta-learners making use of support vector machines and boosted trees seem to do well. As for regression, glmnet and xgboost seem like winners; their $R^2$ and RMSE values are about as good as it gets, and the variation of those performance estimates across tasks varies the least.
+
+```{r, include = FALSE}
+# an attempt at showing both outcomes at once
+metalearners %>%
+  filter(metric %in% c("accuracy", "brier_class", "roc_auc")) %>%
+  filter(!is.na(estimate)) %>%
+  ggplot() + 
+  aes(x = elapsed, y = estimate, col = specification) + 
+  geom_point() +
+  facet_wrap(~metric, scales = "free")
+
+
+best_class_models <- metalearners %>%
+  filter(metric %in% c("accuracy", "brier_class", "roc_auc")) %>%
+  filter(!is.na(estimate)) %>%
+  filter(
+    elapsed < summary(elapsed)[["1st Qu."]]
+  ) %>%
+  group_by(metric) %>%
+  filter(
+    metric %in% c("accuracy", "roc_auc") & estimate > summary(estimate)[["3rd Qu."]] |
+    metric %in% c("brier_class") & estimate < summary(estimate)[["1st Qu."]]
+  )
+
+best_class_models %>%  
+  ggplot() + 
+  aes(x = elapsed, y = estimate, col = specification) + 
+  geom_point() +
+  facet_wrap(~metric, scales = "free")
+```
