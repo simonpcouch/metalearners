@@ -1,0 +1,20 @@
+Package: stacking
+Title: Experiments on Model Stacking Alternatives
+Version: 0.0.1
+Authors@R: c(
+    person("Simon", "Couch", , "simon.couch@posit.co", 
+           role = c("aut", "cre")),
+    person("Max", "Kuhn", , "max@posit.co", role = "aut"),
+    person("Posit Software, PBC", role = c("cph", "fnd"))
+  )
+Description: Supplies a dataset that arose from a set of experiments intended
+    to benchmark the time-to-fit and predictive performance of a number of 
+    alternative model stacking methods (or "meta-learners") for use in the 
+    stacks package.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Depends: 
+    R (>= 2.10)
+LazyData: true
