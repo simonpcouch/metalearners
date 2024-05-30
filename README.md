@@ -1,37 +1,37 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# stacking
+# metalearners
 
 <!-- badges: start -->
 
 [![Lifecycle:
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 [![CRAN
-status](https://www.r-pkg.org/badges/version/stacking)](https://CRAN.R-project.org/package=stacking)
+status](https://www.r-pkg.org/badges/version/metalearners)](https://CRAN.R-project.org/package=metalearners)
 <!-- badges: end -->
 
-The goal of stacking is to provide a dataset that arose from a set of
-experiments intended to benchmark the time-to-fit and predictive
+The goal of metalearners is to provide a dataset that arose from a set
+of experiments intended to benchmark the time-to-fit and predictive
 performance of a number of alternative model stacking methods (or
 “meta-learners”) for use in the stacks package.
 
 ## Installation
 
-You can install the development version of stacking like so:
+You can install the development version of metalearners like so:
 
 ``` r
-pak::pak("simonpcouch/stacking")
+pak::pak("simonpcouch/metalearners")
 ```
 
 ## Data
 
-The dataset in the stacking package looks like this:
+The dataset in the metalearners package looks like this:
 
 ``` r
-library(stacking)
+library(metalearners)
 
-stacking
+metalearners
 #> # A tibble: 217 × 8
 #>    task   meta_learner   recipe  specification elapsed metric estimate estimator
 #>    <fct>  <fct>          <fct>   <fct>           <dbl> <chr>     <dbl> <chr>    

@@ -8,20 +8,20 @@ get_object <- function(x) {
   env[[nm]]
 }
 
-stacking <- lapply(metric_files, get_object)
-stacking <- bind_rows(stacking) %>% unnest(metric)
-stacking <-
-  stacking %>%
+metalearners <- lapply(metric_files, get_object)
+metalearners <- bind_rows(metalearners) %>% unnest(metric)
+metalearners <-
+  metalearners %>%
   mutate(recipe = if_else(recipe == "basic", "minimal", recipe)) %>%
   mutate(meta_learner = paste0(recipe, "_", spec))
 
 # most all of the bagged MARS models ran out of memory and did not tune
-table(stacking$meta_learner)
-stacking <- filter(stacking, !spec == "bm")
+table(metalearners$meta_learner)
+metalearners <- filter(metalearners, !spec == "bm")
 
-stacking
+metalearners
 
-stacking <- stacking %>%
+metalearners <- metalearners %>%
   mutate(
     recipe = case_when(
       recipe == "minimal" ~ "Minimal",
@@ -50,4 +50,4 @@ stacking <- stacking %>%
   ) %>%
   mutate(across(c(task, meta_learner, recipe, specification), as.factor))
 
-usethis::use_data(stacking, overwrite = TRUE)
+usethis::use_data(metalearners, overwrite = TRUE)

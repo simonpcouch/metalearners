@@ -15,29 +15,29 @@ knitr::opts_chunk$set(
 library(tibble)
 ```
 
-# stacking
+# metalearners
 
 <!-- badges: start -->
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
-[![CRAN status](https://www.r-pkg.org/badges/version/stacking)](https://CRAN.R-project.org/package=stacking)
+[![CRAN status](https://www.r-pkg.org/badges/version/metalearners)](https://CRAN.R-project.org/package=metalearners)
 <!-- badges: end -->
 
-The goal of stacking is to provide a dataset that arose from a set of experiments intended to benchmark the time-to-fit and predictive performance of a number of alternative model stacking methods (or "meta-learners") for use in the stacks package.
+The goal of metalearners is to provide a dataset that arose from a set of experiments intended to benchmark the time-to-fit and predictive performance of a number of alternative model stacking methods (or "meta-learners") for use in the stacks package.
 
 ## Installation
 
-You can install the development version of stacking like so:
+You can install the development version of metalearners like so:
 
 ``` r
-pak::pak("simonpcouch/stacking")
+pak::pak("simonpcouch/metalearners")
 ```
 
 ## Data
 
-The dataset in the stacking package looks like this:
+The dataset in the metalearners package looks like this:
 
 ```{r example}
-library(stacking)
+library(metalearners)
 
-stacking
+metalearners
 ```

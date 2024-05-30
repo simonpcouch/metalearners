@@ -1,7 +1,7 @@
-#' Data on model stacking experiments
+#' Data on model metalearners experiments
 #'
 #' @description
-#' `stacking` arose from a set of experiments intended to benchmark the
+#' `metalearners` arose from a set of experiments intended to benchmark the
 #' time-to-fit and predictive performance of a number of alternative model
 #' stacking methods (or "meta-learners") for use in the \pkg{stacks} package.
 #' Each row in the data represents a unique combination of task, proposed
@@ -19,7 +19,7 @@
 #' running Linux Ubuntu 24.04. Computations were distributed using forking with
 #' 5 cores (except for tasks `caret` and `nhl`, which used 2 cores.)
 #'
-#' @format ## `stacking`
+#' @format ## `metalearners`
 #' A data frame with 217 rows and 8 columns:
 #' \describe{
 #'   \item{task}{Factor. A descriptor of a modeling task, i.e. a dataset.}
@@ -46,8 +46,8 @@
 #' @source <https://github.com/simonpcouch/metalearner>
 #'
 #' @examples
-#' str(stacking)
+#' str(metalearners)
 #'
-#' stacking
+#' metalearners
 #'
-"stacking"
+"metalearners"
